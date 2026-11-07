@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>后台 · 歌单</title>
+<meta name="theme-color" content="#fbf9f7" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="stylesheet" href="./style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>" />
+</head>
+<body>
+
+<div id="setupView" class="wrap" hidden>
+  <div class="login-card" style="max-width: 460px">
+    <h2>第一次使用：连上仓库</h2>
+    <p>填一次就行，会记在这台设备的浏览器里</p>
+    <form id="setupForm">
+      <div class="field">
+        <label for="sOwner">GitHub 用户名</label>
+        <input id="sOwner" type="text" autocomplete="off" spellcheck="false" required placeholder="比如 xiaoxing" />
+      </div>
+      <div class="field">
+        <label for="sRepo">仓库名</label>
+        <input id="sRepo" type="text" autocomplete="off" spellcheck="false" required placeholder="比如 songlist" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="sBranch">分支</label>
+          <input id="sBranch" type="text" autocomplete="off" spellcheck="false" value="main" />
+        </div>
+        <div class="field">
+          <label for="sPath">歌单文件路径</label>
+          <input id="sPath" type="text" autocomplete="off" spellcheck="false" value="songs.json" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="sToken">GitHub 令牌（只给这个仓库的 Contents 读写权限）</label>
+        <input id="sToken" type="password" autocomplete="off" spellcheck="false" required placeholder="github_pat_..." />
+      </div>
+      <button class="btn primary block" type="submit" id="setupBtn">连接并验证</button>
+    </form>
+    <p class="muted" style="margin: 16px 0 0; text-align: center">
+      令牌只存在这台设备的浏览器里，不会上传到别的地方
+    </p>
+  </div>
+</div>
+
+<div id="appView" class="wrap wide" hidden>
+  <div class="topbar">
+    <h1>歌单后台</h1>
+    <div class="row" style="flex: none; align-items: center">
+      <span class="muted" id="whoami" style="flex: none"></span>
+      <a class="btn ghost sm" href="./index.html" target="_blank">看观众页</a>
+      <button class="btn ghost sm" id="disconnectBtn">断开</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="list">歌单</button>
+    <button class="tab" data-tab="add">添加歌曲</button>
+    <button class="tab" data-tab="import">批量导入</button>
+  </div>
+
+  <section class="panel active" data-panel="list">
+    <div class="card">
+      <div class="row" style="align-items: center">
+        <input id="filter" type="text" placeholder="在歌单里筛一下…" style="flex: 2" />
+        <span class="muted" id="listCount" style="flex: none"></span>
+      </div>
+    </div>
+    <div class="card" style="padding: 8px 18px">
+      <ul class="admin-list" id="adminList"></ul>
+      <div id="listEmpty" class="empty" hidden>
+        <div class="big">🎵</div>
+        <div>还没有歌，去「添加歌曲」或「批量导入」吧</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="add">
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 17px">加一首歌</h3>
+      <form id="addForm">
+        <div class="row">
+          <div class="field">
+            <label for="aTitle">歌名 *</label>
+            <input id="aTitle" type="text" required maxlength="120" placeholder="比如 晴天" />
+          </div>
+          <div class="field">
+            <label for="aArtist">歌手</label>
+            <input id="aArtist" type="text" maxlength="120" placeholder="比如 周杰伦" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="aKey">调性（选填）</label>
+            <input id="aKey" type="text" maxlength="40" placeholder="比如 C 大调" />
+          </div>
+          <div class="field">
+            <label for="aLang">语言（选填）</label>
+            <input id="aLang" type="text" maxlength="40" placeholder="比如 国语 / 粤语 / 日语" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="aTags">标签（选填，逗号分隔）</label>
+          <input id="aTags" type="text" placeholder="比如 抒情, 慢歌, 必点" />
+        </div>
+        <button class="btn primary" type="submit" id="addBtn">加进歌单</button>
+      </form>
+      <p class="muted" style="margin-bottom: 0">
+        注意：这个仓库是公开的，观众能看到这里填的所有内容，所以没有放「私密备注」。
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="import">
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 17px">批量导入</h3>
+      <p class="muted" style="margin-top: 0">
+        一行一首，这些写法都认：<br />
+        <code>歌名 - 歌手</code> 或 <code>歌名|歌手</code> 或 <code>歌名,歌手</code>，只写歌名也行。
+      </p>
+      <div class="field">
+        <textarea id="importText" placeholder="晴天 - 周杰伦&#10;七里香 - 周杰伦&#10;后来|刘若英&#10;小幸运"></textarea>
+      </div>
+      <button class="btn primary" id="importBtn">导入</button>
+      <p class="muted" id="importResult" style="margin-bottom: 0"></p>
+    </div>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3>编辑歌曲</h3>
+    <form id="editForm">
+      <div class="field">
+        <label for="eTitle">歌名 *</label>
+        <input id="eTitle" type="text" required maxlength="120" />
+      </div>
+      <div class="field">
+        <label for="eArtist">歌手</label>
+        <input id="eArtist" type="text" maxlength="120" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="eKey">调性</label>
+          <input id="eKey" type="text" maxlength="40" />
+        </div>
+        <div class="field">
+          <label for="eLang">语言</label>
+          <input id="eLang" type="text" maxlength="40" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="eTags">标签（逗号分隔）</label>
+        <input id="eTags" type="text" />
+      </div>
+      <div class="row" style="justify-content: flex-end">
+        <button type="button" class="btn ghost" id="cancelEdit" style="flex: none">取消</button>
+        <button type="submit" class="btn primary" style="flex: none">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="./core.js"></script>
+<script>
+(function () {
+  var Core = window.SongCore;
+  var KEY = 'songlist_gh_config';
+  var store = null;
+  var songs = [];
+  var editingId = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function toast(msg, isError) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.className = 'toast'; }, 3000);
+  }
+
+  function loadConfig() {
+    try {
+      return JSON.parse(localStorage.getItem(KEY) || 'null');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveConfig(cfg) {
+    localStorage.setItem(KEY, JSON.stringify(cfg));
+  }
+
+  function connect(cfg) {
+    store = new Core.GitHubStore(cfg);
+    $('setupView').hidden = true;
+    $('appView').hidden = false;
+    $('whoami').textContent = cfg.owner + '/' + cfg.repo;
+    refresh();
+  }
+
+  function refresh() {
+    return store.load().then(function (data) {
+      songs = data.songs;
+      renderList();
+      return data;
+    }).catch(function (err) {
+      toast(err.message, true);
+      throw err;
+    });
+  }
+
+  // ---------------- 首次设置 ----------------
+  $('setupForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = $('setupBtn');
+    btn.disabled = true;
+    btn.textContent = '验证中…';
+    var cfg = {
+      owner: $('sOwner').value.trim(),
+      repo: $('sRepo').value.trim(),
+      branch: $('sBranch').value.trim() || 'main',
+      path: $('sPath').value.trim() || 'songs.json',
+      token: $('sToken').value.trim(),
+    };
+    var probe = new Core.GitHubStore(cfg);
+    probe.load().then(function () {
+      saveConfig(cfg);
+      connect(cfg);
+      toast('连接成功');
+    }).catch(function (err) {
+      toast(err.message, true);
+    }).finally(function () {
+      btn.disabled = false;
+      btn.textContent = '连接并验证';
+    });
+  });
+
+  $('disconnectBtn').addEventListener('click', function () {
+    if (!confirm('断开后需要重新填令牌才能再改歌单，确定吗？')) return;
+    localStorage.removeItem(KEY);
+    store = null;
+    songs = [];
+    $('appView').hidden = true;
+    $('setupView').hidden = false;
+  });
+
+  // ---------------- 标签页 ----------------
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.querySelectorAll('.panel').forEach(function (p) {
+        p.classList.toggle('active', p.dataset.panel === tab.dataset.tab);
+      });
+    });
+  });
+
+  // ---------------- 列表 ----------------
+  function renderList() {
+    var kw = Core.normalize($('filter').value);
+    var list = songs.filter(function (s) {
+      if (!kw) return true;
+      return Core.normalize([s.title, s.artist, (s.tags || []).join(' '), s.language, s.key].join(' ')).indexOf(kw) >= 0;
+    });
+    $('listCount').textContent = list.length + ' / ' + songs.length + ' 首';
+    $('listEmpty').hidden = list.length > 0;
+    $('adminList').innerHTML = list
+      .map(function (s) {
+        var meta = [s.artist, s.key, s.language].filter(Boolean).map(escapeHtml).join(' · ');
+        return (
+          '<li class="admin-item">' +
+          '<div class="main">' +
+          '<div class="title">' + escapeHtml(s.title) + '</div>' +
+          '<div class="meta">' + (meta || '（没填歌手）') + '</div>' +
+          '</div>' +
+          '<button class="btn ghost sm" data-edit="' + escapeHtml(s.id) + '">编辑</button>' +
+          '<button class="btn danger sm" data-del="' + escapeHtml(s.id) + '">删除</button>' +
+          '</li>'
+        );
+      })
+      .join('');
+  }
+
+  $('filter').addEventListener('input', renderList);
+
+  $('adminList').addEventListener('click', function (e) {
+    var editId = e.target.getAttribute('data-edit');
+    var delId = e.target.getAttribute('data-del');
+
+    if (editId) {
+      var s = songs.find(function (x) { return x.id === editId; });
+      if (!s) return;
+      editingId = editId;
+      $('eTitle').value = s.title || '';
+      $('eArtist').value = s.artist || '';
+      $('eKey').value = s.key || '';
+      $('eLang').value = s.language || '';
+      $('eTags').value = (s.tags || []).join(', ');
+      $('modal').classList.add('show');
+    }
+
+    if (delId) {
+      var d = songs.find(function (x) { return x.id === delId; });
+      if (!confirm('确定删掉「' + (d ? d.title : '') + '」吗？')) return;
+      store.mutate(function (list) {
+        return list.filter(function (x) { return x.id !== delId; });
+      }, '删除歌曲：' + (d ? d.title : '')).then(function (res) {
+        songs = res.songs;
+        renderList();
+        toast('删掉了');
+      }).catch(function (err) { toast(err.message, true); });
+    }
+  });
+
+  // ---------------- 添加 ----------------
+  $('addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = $('addBtn');
+    btn.disabled = true;
+    var song;
+    try {
+      song = Core.cleanSong({
+        title: $('aTitle').value,
+        artist: $('aArtist').value,
+        key: $('aKey').value,
+        language: $('aLang').value,
+        tags: $('aTags').value,
+      });
+    } catch (err) {
+      toast(err.message, true);
+      btn.disabled = false;
+      return;
+    }
+    store.mutate(function (list) {
+      return list.concat([song]);
+    }, '添加歌曲：' + song.title).then(function (res) {
+      songs = res.songs;
+      renderList();
+      $('addForm').reset();
+      toast('「' + song.title + '」已加入');
+    }).catch(function (err) {
+      toast(err.message, true);
+    }).finally(function () {
+      btn.disabled = false;
+    });
+  });
+
+  // ---------------- 编辑 ----------------
+  $('cancelEdit').addEventListener('click', function () {
+    $('modal').classList.remove('show');
+  });
+  $('modal').addEventListener('click', function (e) {
+    if (e.target === $('modal')) $('modal').classList.remove('show');
+  });
+
+  $('editForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var patch;
+    try {
+      patch = Core.cleanSong({
+        id: editingId,
+        title: $('eTitle').value,
+        artist: $('eArtist').value,
+        key: $('eKey').value,
+        language: $('eLang').value,
+        tags: $('eTags').value,
+      });
+    } catch (err) {
+      toast(err.message, true);
+      return;
+    }
+    store.mutate(function (list) {
+      return list.map(function (x) {
+        if (x.id !== editingId) return x;
+        return Object.assign({}, x, {
+          title: patch.title,
+          artist: patch.artist,
+          key: patch.key,
+          language: patch.language,
+          tags: patch.tags,
+        });
+      });
+    }, '修改歌曲：' + patch.title).then(function (res) {
+      songs = res.songs;
+      renderList();
+      $('modal').classList.remove('show');
+      toast('改好了');
+    }).catch(function (err) { toast(err.message, true); });
+  });
+
+  // ---------------- 导入 ----------------
+  $('importBtn').addEventListener('click', function () {
+    var text = $('importText').value;
+    if (!text.trim()) return toast('先贴点内容进来', true);
+    var btn = this;
+    btn.disabled = true;
+    store.mutate(function (list) {
+      var parsed = Core.parseImport(text, list);
+      $('importResult').textContent =
+        '新增 ' + parsed.added.length + ' 首' +
+        (parsed.skipped.length ? '，跳过重复 ' + parsed.skipped.length + ' 首' : '');
+      return list.concat(parsed.added);
+    }, '批量导入歌曲').then(function (res) {
+      songs = res.songs;
+      renderList();
+      $('importText').value = '';
+      toast('导入完成');
+    }).catch(function (err) {
+      toast(err.message, true);
+    }).finally(function () {
+      btn.disabled = false;
+    });
+  });
+
+  // ---------------- 启动 ----------------
+  var cfg = loadConfig();
+  if (cfg && cfg.token) {
+    var probe = new Core.GitHubStore(cfg);
+    probe.load().then(function () {
+      connect(cfg);
+    }).catch(function () {
+      $('setupView').hidden = false;
+      $('sOwner').value = cfg.owner || '';
+      $('sRepo').value = cfg.repo || '';
+      $('sBranch').value = cfg.branch || 'main';
+      $('sPath').value = cfg.path || 'songs.json';
+    });
+  } else {
+    $('setupView').hidden = false;
+  }
+})();
+</script>
+</body>
+</html>

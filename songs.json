@@ -1,0 +1,38 @@
+[
+  {
+    "id": "demo-1",
+    "title": "晴天",
+    "artist": "周杰伦",
+    "key": "C 大调",
+    "language": "国语",
+    "tags": ["抒情", "必点"],
+    "createdAt": 1762500000000
+  },
+  {
+    "id": "demo-2",
+    "title": "七里香",
+    "artist": "周杰伦",
+    "key": "D 大调",
+    "language": "国语",
+    "tags": ["抒情"],
+    "createdAt": 1762500001000
+  },
+  {
+    "id": "demo-3",
+    "title": "后来",
+    "artist": "刘若英",
+    "key": "",
+    "language": "国语",
+    "tags": ["慢歌"],
+    "createdAt": 1762500002000
+  },
+  {
+    "id": "demo-4",
+    "title": "Lemon",
+    "artist": "米津玄师",
+    "key": "",
+    "language": "日语",
+    "tags": ["高音"],
+    "createdAt": 1762500003000
+  }
+]

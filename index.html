@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>歌单</title>
+<meta name="theme-color" content="#fbf9f7" />
+<meta name="description" content="这里是我会唱的歌，可以按歌名或歌手搜索。" />
+<link rel="stylesheet" href="./style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>" />
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1 id="siteName">歌单</h1>
+    <p id="siteSubtitle">这里是我会唱的歌，搜一下看看有没有你想听的</p>
+    <span class="badge" id="totalBadge">…</span>
+  </header>
+
+  <div class="search">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        id="q"
+        type="search"
+        placeholder="搜歌名或歌手，比如「周杰伦」「晴天」"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        enterkeyhint="search"
+      />
+      <button class="clear-btn" id="clear" aria-label="清空">×</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="排序">
+      <button class="chip active" data-sort="new">最近加入</button>
+      <button class="chip" data-sort="title">按歌名</button>
+      <button class="chip" data-sort="artist">按歌手</button>
+    </div>
+    <span class="count" id="count"></span>
+  </div>
+
+  <ul class="songs" id="list"></ul>
+  <div id="empty" class="empty" hidden>
+    <div class="big">🎵</div>
+    <div id="emptyText">歌单还是空的</div>
+  </div>
+
+  <p class="hint" id="hint"></p>
+</div>
+
+<script src="./core.js"></script>
+<script>
+(function () {
+  var Core = window.SongCore;
+  var all = [];
+  var state = { q: '', sort: 'new' };
+
+  var $q = document.getElementById('q');
+  var $list = document.getElementById('list');
+  var $count = document.getElementById('count');
+  var $empty = document.getElementById('empty');
+  var $emptyText = document.getElementById('emptyText');
+  var $total = document.getElementById('totalBadge');
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render(list) {
+    $list.innerHTML = list
+      .map(function (s, i) {
+        var tags = '';
+        if (s.key) tags += '<span class="tag key">' + escapeHtml(s.key) + '</span>';
+        if (s.language) tags += '<span class="tag">' + escapeHtml(s.language) + '</span>';
+        (s.tags || []).forEach(function (t) {
+          tags += '<span class="tag">' + escapeHtml(t) + '</span>';
+        });
+        return (
+          '<li class="song">' +
+          '<span class="num">' + (i + 1) + '</span>' +
+          '<div class="main">' +
+          '<div class="title">' + escapeHtml(s.title) + '</div>' +
+          (s.artist ? '<div class="artist">' + escapeHtml(s.artist) + '</div>' : '') +
+          (tags ? '<div class="tags">' + tags + '</div>' : '') +
+          '</div>' +
+          '</li>'
+        );
+      })
+      .join('');
+  }
+
+  function apply() {
+    var matched = state.q ? Core.searchSongs(all, state.q) : all.slice();
+    var list = Core.sortSongs(matched, state.sort);
+    $count.textContent = state.q ? '找到 ' + list.length + ' 首' : '';
+    render(list);
+    if (list.length === 0) {
+      $list.hidden = true;
+      $empty.hidden = false;
+      $emptyText.textContent = state.q
+        ? '没找到「' + state.q + '」，换个关键词试试'
+        : '歌单还是空的，等主播加歌吧';
+    } else {
+      $list.hidden = false;
+      $empty.hidden = true;
+    }
+  }
+
+  $q.addEventListener('input', function () {
+    state.q = $q.value.trim();
+    document.getElementById('clear').classList.toggle('show', $q.value.length > 0);
+    apply();
+  });
+
+  document.getElementById('clear').addEventListener('click', function () {
+    $q.value = '';
+    state.q = '';
+    this.classList.remove('show');
+    $q.focus();
+    apply();
+  });
+
+  document.querySelectorAll('.chip').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.chip').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.sort = btn.dataset.sort;
+      apply();
+    });
+  });
+
+  // 读取同目录下的 songs.json；加时间戳绕过缓存
+  fetch('./songs.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      all = Array.isArray(data) ? data : [];
+      $total.textContent = '共 ' + all.length + ' 首';
+      apply();
+    })
+    .catch(function () {
+      $total.textContent = '读取失败';
+      $list.hidden = true;
+      $empty.hidden = false;
+      $emptyText.textContent = '歌单读取失败，刷新一下试试';
+    });
+
+  // 站点名（改地址栏里的 ?name= 就能临时换，或直接改这个文件）
+  var params = new URLSearchParams(location.search);
+  if (params.get('name')) {
+    document.title = params.get('name');
+    document.getElementById('siteName').textContent = params.get('name');
+  }
+})();
+</script>
+</body>
+</html>
