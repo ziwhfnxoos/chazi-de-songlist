@@ -248,8 +248,22 @@
     });
   });
 
+  var disconnectArmed = false;
   $('disconnectBtn').addEventListener('click', function () {
-    if (!confirm('断开后需要重新填令牌才能再改歌单，确定吗？')) return;
+    var btn = this;
+    if (!disconnectArmed) {
+      disconnectArmed = true;
+      btn.textContent = '确认断开？';
+      clearTimeout(btn._disarm);
+      btn._disarm = setTimeout(function () {
+        disconnectArmed = false;
+        btn.textContent = '断开';
+      }, 4000);
+      return;
+    }
+    clearTimeout(btn._disarm);
+    btn.textContent = '断开';
+    disconnectArmed = false;
     localStorage.removeItem(KEY);
     store = null;
     songs = [];
@@ -313,15 +327,39 @@
     }
 
     if (delId) {
+      // 不用浏览器原生 confirm（有些浏览器/环境会静默拦截），改成点两次确认
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.textContent = '确认删除';
+        btn.style.background = '#b3261e';
+        btn.style.color = '#fff';
+        clearTimeout(btn._disarm);
+        btn._disarm = setTimeout(function () {
+          btn.setAttribute('data-armed', '0');
+          btn.textContent = '删除';
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 4000);
+        return;
+      }
+      clearTimeout(btn._disarm);
+      btn.disabled = true;
+      btn.textContent = '删除中…';
       var d = songs.find(function (x) { return x.id === delId; });
-      if (!confirm('确定删掉「' + (d ? d.title : '') + '」吗？')) return;
       store.mutate(function (list) {
         return list.filter(function (x) { return x.id !== delId; });
       }, '删除歌曲：' + (d ? d.title : '')).then(function (res) {
         songs = res.songs;
         renderList();
         toast('删掉了');
-      }).catch(function (err) { toast(err.message, true); });
+      }).catch(function (err) {
+        toast(err.message, true);
+        btn.disabled = false;
+        btn.textContent = '删除';
+        btn.style.background = '';
+        btn.style.color = '';
+      });
     }
   });
 
