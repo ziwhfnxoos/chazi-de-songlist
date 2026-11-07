@@ -2,13 +2,10 @@
   {
     "id": "demo-1",
     "title": "晴天",
-    "artist": "周杰伦",
-    "key": "C 大调",
-    "language": "国语",
-    "tags": [
-      "抒情",
-      "必点"
-    ],
+    "artist": "",
+    "key": "",
+    "language": "",
+    "tags": [],
     "createdAt": 1762500000000
   },
   {
